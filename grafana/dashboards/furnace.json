@@ -1,0 +1,151 @@
+{
+  "title": "Промышленная печь",
+  "uid": "furnace-main",
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-10m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Управление",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "options": {
+        "mode": "html",
+        "content": "<iframe src='http://localhost:1880/ui' style='width:100%;height:100%;border:none;background:transparent'></iframe>"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Статус аварии",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "НОРМА", "color": "green" }, "1": { "text": "АВАРИЯ", "color": "red" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "influxdb", "uid": "influxdb-furnace" },
+          "rawQuery": true,
+          "query": "SELECT last(\"alarm\") FROM \"furnace\" WHERE $timeFilter",
+          "resultFormat": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Температура (°C)",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 300,
+          "unit": "celsius",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "influxdb", "uid": "influxdb-furnace" },
+          "rawQuery": true,
+          "query": "SELECT last(\"temperature\") FROM \"furnace\" WHERE $timeFilter",
+          "resultFormat": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "gauge",
+      "title": "Мощность ТЭНа (%)",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 80 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "influxdb", "uid": "influxdb-furnace" },
+          "rawQuery": true,
+          "query": "SELECT last(\"power\") FROM \"furnace\" WHERE $timeFilter",
+          "resultFormat": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "График температуры",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 100 }]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "influxdb", "uid": "influxdb-furnace" },
+          "rawQuery": true,
+          "query": "SELECT mean(\"temperature\") FROM \"furnace\" WHERE $timeFilter GROUP BY time($__interval) fill(previous)",
+          "resultFormat": "time_series",
+          "refId": "A",
+          "alias": "Температура"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "График мощности",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "influxdb", "uid": "influxdb-furnace" },
+          "rawQuery": true,
+          "query": "SELECT mean(\"power\") FROM \"furnace\" WHERE $timeFilter GROUP BY time($__interval) fill(previous)",
+          "resultFormat": "time_series",
+          "refId": "A",
+          "alias": "Мощность"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 36
+}

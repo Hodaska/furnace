@@ -1,0 +1,288 @@
+[
+  {
+    "id": "modbus-cfg",
+    "type": "modbus-client",
+    "name": "OpenPLC",
+    "clienttype": "tcp",
+    "bufferCommands": false,
+    "stateLogEnabled": false,
+    "queueLogEnabled": false,
+    "tcpHost": "openplc",
+    "tcpPort": "502",
+    "tcpType": "DEFAULT",
+    "unitId": "1",
+    "commandDelay": 1,
+    "clientTimeout": 1000,
+    "reconnectOnTimeout": true,
+    "reconnectTimeout": 2000,
+    "showWarnings": true
+  },
+  {
+    "id": "influx-cfg",
+    "type": "influxdb",
+    "hostname": "influxdb",
+    "port": "8086",
+    "protocol": "http",
+    "database": "furnace",
+    "name": "InfluxDB",
+    "usetls": false,
+    "tls": "",
+    "influxdbVersion": "1.x",
+    "url": "http://influxdb:8086",
+    "rejectUnauthorized": false
+  },
+
+  {
+    "id": "n1",
+    "type": "inject",
+    "name": "tick 1s Temp",
+    "repeat": "1",
+    "once": true,
+    "onceDelay": "2",
+    "payload": "",
+    "payloadType": "date",
+    "wires": [["n2"]]
+  },
+  {
+    "id": "n2",
+    "type": "http request",
+    "name": "GET Temperature",
+    "method": "GET",
+    "ret": "txt",
+    "url": "http://math-model:8888/temperature",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "wires": [["n3"]]
+  },
+  {
+    "id": "n3",
+    "type": "function",
+    "name": "Temp process",
+    "func": "var temp = parseFloat(msg.payload) || 20.0;\nnode.send([\n  {payload: [Math.round(temp * 10)]},\n  {payload: {temperature: temp}}\n]);\nreturn null;",
+    "outputs": 2,
+    "wires": [["n4"], ["n5"]]
+  },
+  {
+    "id": "n4",
+    "type": "modbus-write",
+    "name": "Temp->PLC",
+    "showStatusActivities": false,
+    "showErrors": true,
+    "unitid": "1",
+    "dataType": "MHoldingRegisters",
+    "adr": "0",
+    "quantity": "1",
+    "server": "modbus-cfg",
+    "wires": [[]]
+  },
+  {
+    "id": "n5",
+    "type": "influxdb out",
+    "name": "Temp->Influx",
+    "influxdb": "influx-cfg",
+    "measurement": "furnace",
+    "precision": "",
+    "retentionPolicy": "",
+    "wires": []
+  },
+
+  {
+    "id": "n6",
+    "type": "inject",
+    "name": "tick 1s Power",
+    "repeat": "1",
+    "once": true,
+    "onceDelay": "2",
+    "payload": "",
+    "payloadType": "date",
+    "wires": [["n7", "n8"]]
+  },
+  {
+    "id": "n7",
+    "type": "modbus-read",
+    "name": "Power from PLC",
+    "topic": "",
+    "showStatusActivities": false,
+    "showErrors": true,
+    "unitid": "1",
+    "dataType": "HoldingRegister",
+    "adr": "1",
+    "quantity": "1",
+    "rate": "1",
+    "rateUnit": "s",
+    "server": "modbus-cfg",
+    "wires": [[], []]
+  },
+  {
+    "id": "n8",
+    "type": "function",
+    "name": "Power process",
+    "func": "var running = global.get('running') || false;\nvar power = running ? 100 : 0;\nnode.send([\n  {url: 'http://math-model:8888/power?value=' + power, method: 'POST', payload: ''},\n  {payload: {power: power}}\n]);\nreturn null;",
+    "outputs": 2,
+    "wires": [["n9"], ["n10"]]
+  },
+  {
+    "id": "n9",
+    "type": "http request",
+    "name": "Power->MathModel",
+    "method": "use",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "wires": [[]]
+  },
+  {
+    "id": "n10",
+    "type": "influxdb out",
+    "name": "Power->Influx",
+    "influxdb": "influx-cfg",
+    "measurement": "furnace",
+    "precision": "",
+    "retentionPolicy": "",
+    "wires": []
+  },
+
+  {
+    "id": "n11",
+    "type": "inject",
+    "name": "tick 1s Alarm",
+    "repeat": "1",
+    "once": true,
+    "onceDelay": "2",
+    "payload": "",
+    "payloadType": "date",
+    "wires": [["n12"]]
+  },
+  {
+    "id": "n12",
+    "type": "modbus-read",
+    "name": "Alarm from PLC",
+    "topic": "",
+    "showStatusActivities": false,
+    "showErrors": true,
+    "unitid": "1",
+    "dataType": "Coil",
+    "adr": "1",
+    "quantity": "1",
+    "rate": "1",
+    "rateUnit": "s",
+    "server": "modbus-cfg",
+    "wires": [["n13"], []]
+  },
+  {
+    "id": "n13",
+    "type": "function",
+    "name": "Alarm process",
+    "func": "var raw = msg.payload;\nif (Array.isArray(raw)) raw = raw[0];\nvar alarm = raw ? 1 : 0;\nif (alarm === 1) global.set('running', false);\nmsg.payload = {alarm: alarm};\nreturn msg;",
+    "outputs": 1,
+    "wires": [["n14"]]
+  },
+  {
+    "id": "n14",
+    "type": "influxdb out",
+    "name": "Alarm->Influx",
+    "influxdb": "influx-cfg",
+    "measurement": "furnace",
+    "precision": "",
+    "retentionPolicy": "",
+    "wires": []
+  },
+
+  {
+    "id": "n15",
+    "type": "http in",
+    "name": "POST /start",
+    "url": "/start",
+    "method": "post",
+    "wires": [["n16"]]
+  },
+  {
+    "id": "n16",
+    "type": "function",
+    "name": "Start=1",
+    "func": "global.set('running', true);\nnode.send([{payload: [1]}, {payload: 'OK', statusCode: 200, res: msg.res, _msgid: msg._msgid}]);\nreturn null;",
+    "outputs": 2,
+    "wires": [["n18"], ["n17"]]
+  },
+  {
+    "id": "n17",
+    "type": "http response",
+    "statusCode": "200",
+    "wires": []
+  },
+  {
+    "id": "n19",
+    "type": "http in",
+    "name": "POST /stop",
+    "url": "/stop",
+    "method": "post",
+    "wires": [["n20"]]
+  },
+  {
+    "id": "n20",
+    "type": "function",
+    "name": "Stop=0",
+    "func": "global.set('running', false);\nnode.send([{payload: [0]}, {payload: 'OK', statusCode: 200, res: msg.res, _msgid: msg._msgid}, {url: 'http://math-model:8888/power?value=0', method: 'POST', payload: ''}]);\nreturn null;",
+    "outputs": 3,
+    "wires": [["n18"], ["n21"], ["n22"]]
+  },
+  {
+    "id": "n22",
+    "type": "http request",
+    "name": "Stop->MathModel",
+    "method": "use",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "",
+    "wires": [[]]
+  },
+  {
+    "id": "n21",
+    "type": "http response",
+    "statusCode": "200",
+    "wires": []
+  },
+  {
+    "id": "n18",
+    "type": "modbus-write",
+    "name": "Start->PLC",
+    "showStatusActivities": false,
+    "showErrors": true,
+    "unitid": "1",
+    "dataType": "Coil",
+    "adr": "0",
+    "quantity": "1",
+    "server": "modbus-cfg",
+    "wires": [[]]
+  },
+
+  {
+    "id": "ui-in",
+    "type": "http in",
+    "name": "GET /ui",
+    "url": "/ui",
+    "method": "get",
+    "wires": [["ui-tpl"]]
+  },
+  {
+    "id": "ui-tpl",
+    "type": "template",
+    "name": "Control HTML",
+    "template": "<!DOCTYPE html><html><head><meta charset='utf-8'><style>body{margin:0;background:#1a1a2e;display:flex;align-items:center;justify-content:center;height:100vh;gap:16px;font-family:sans-serif}button{padding:14px 36px;font-size:18px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}#btn-start{background:#2ecc71;color:#fff}#btn-stop{background:#e74c3c;color:#fff}button:active{opacity:.8}</style></head><body><button id='btn-start' onclick=\"fetch('/start',{method:'POST'})\">&#9654; СТАРТ</button><button id='btn-stop' onclick=\"fetch('/stop',{method:'POST'})\">&#9632; СТОП</button></body></html>",
+    "output": "str",
+    "wires": [["ui-res"]]
+  },
+  {
+    "id": "ui-res",
+    "type": "http response",
+    "statusCode": "200",
+    "headers": {"content-type": "text/html; charset=utf-8"},
+    "wires": []
+  }
+]

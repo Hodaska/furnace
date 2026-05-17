@@ -1,0 +1,11 @@
+# Go
+math-model/furnace
+math-model/*.exe
+
+# Docker volumes
+influxdb-data/
+grafana-data/
+
+# OS
+.DS_Store
+Thumbs.db
