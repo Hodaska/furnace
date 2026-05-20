@@ -1,18 +1,23 @@
-version: '3.8'
+name: furnace
 
 services:
 
   math-model:
     build: ./math-model
-    container_name: math-model
+    container_name: furnace-math-model
     ports:
       - "4840:4840"
       - "8888:8888"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/temperature"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   openplc:
     build: ./openplc
-    container_name: openplc
+    container_name: furnace-openplc
     ports:
       - "8080:8080"
       - "502:502"
@@ -20,7 +25,7 @@ services:
 
   influxdb:
     image: influxdb:1.8
-    container_name: influxdb
+    container_name: furnace-influxdb
     ports:
       - "8086:8086"
     environment:
@@ -29,23 +34,31 @@ services:
     volumes:
       - influxdb-data:/var/lib/influxdb
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   node-red:
     build: ./node-red
-    container_name: node-red
+    container_name: furnace-node-red
     ports:
       - "1880:1880"
     volumes:
       - ./node-red/flows.json:/data/flows.json
     depends_on:
-      - math-model
-      - openplc
-      - influxdb
+      math-model:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      openplc:
+        condition: service_started
     restart: unless-stopped
 
   grafana:
     image: grafana/grafana:10.4.0
-    container_name: grafana
+    container_name: furnace-grafana
     ports:
       - "3000:3000"
     environment:
@@ -55,12 +68,14 @@ services:
       - GF_SECURITY_CONTENT_SECURITY_POLICY=false
       - GF_UNIFIED_ALERTING_ENABLED=true
       - GF_ALERTING_ENABLED=false
+      - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=1s
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
