@@ -3,12 +3,14 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Moscow
 
-COPY runtime /workdir
+RUN apt-get update && apt-get install -y git dos2unix sqlite3 && rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/thiagoralves/OpenPLC_v3.git /workdir
 
 WORKDIR /workdir
 
-RUN apt-get update && apt-get install -y dos2unix && rm -rf /var/lib/apt/lists/* \
-    && find /workdir -type f -exec dos2unix {} \;
+RUN find /workdir -type f -name "*.sh" -exec dos2unix {} \; 2>/dev/null || true \
+    && find /workdir -type f -name "*.py" -exec dos2unix {} \; 2>/dev/null || true
 
 RUN mkdir /docker_persistent
 
